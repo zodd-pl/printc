@@ -1,0 +1,141 @@
+
+#include <cstddef>
+#include <stdexcept>
+#include <array>
+#include <type_traits>
+
+class str_const 
+{ 
+public:
+	const char* const p_;
+	const std::size_t sz_;
+public:
+	template<std::size_t N>
+	constexpr str_const(const char (&a)[N]) : 
+      p_(a), sz_(N - 1) 
+	{
+	}
+	constexpr char operator[](std::size_t n) const
+	{ 
+		return n < sz_ ? p_[n] : throw std::out_of_range("");
+	}
+	constexpr std::size_t size() const
+	{
+		return sz_;
+	} 
+};
+
+
+#define CONSTANT(...) \
+  union { static constexpr auto value() { return __VA_ARGS__; } }
+
+#define CONSTANT_VALUE(...) \
+  [] { using R = CONSTANT(__VA_ARGS__); return R{}; }()
+
+#define CSTR(s) CONSTANT_VALUE(str_const(s))
+
+
+constexpr std::uint8_t next_arg(str_const str,std::uint8_t pos)
+{
+    while(pos < str.size() && str[pos]!='%')
+    {
+        pos++;
+    }
+    return pos;
+}
+
+constexpr bool is_one_before_last(str_const str,std::uint8_t pos )
+{
+    return pos + 1 < str.size();
+}
+
+constexpr std::uint8_t count_args(str_const str)
+{
+    std:uint8_t args =0;
+    
+    for (std::uint8_t pos = 0 ; pos < str.size(); pos++)
+    {
+         if (str[pos]=='%')
+        {
+            args++;
+        }       
+    }
+
+    return args;
+}
+
+template<typename FROM,typename TO>
+constexpr void check_conversion(FROM && from)
+{
+    volatile const TO & t = from;
+}
+
+
+template <typename FORMAT, typename T>
+constexpr bool check_args(FORMAT , T && t)
+{
+    constexpr auto str = FORMAT::value();
+
+    if ( count_args(str)!=1)
+    {
+        throw std::out_of_range("wrong argument number of arguments");  
+    }
+
+
+    constexpr auto pos = next_arg(str,0);
+    if (is_one_before_last(str,pos) )
+    {
+        constexpr auto spec = pos+1;
+        constexpr auto arg = str[spec];
+        if constexpr (arg == 'c')
+        {
+            check_conversion<T,char>(std::forward<T>(t));
+        }
+        else if constexpr ( arg == 'd')
+        {
+           check_conversion<T,int>(std::forward<T>(t));
+        }
+        else
+        {
+  		    throw std::out_of_range("unknown conversion specifier");               
+        }
+    }
+    else
+    {
+ 		throw std::out_of_range("");       
+    }
+
+    return true;
+}
+
+
+template <typename FORMAT,typename T>
+constexpr std::size_t printc(FORMAT f, T && t)
+{
+	constexpr bool test = check_args<FORMAT,T>(f,std::forward<T>(t));
+	if (test)
+	{
+		printf(FORMAT::value().p_,t);
+	}
+	else
+	{
+		
+	}
+
+	return 1;
+}
+
+
+int main()
+{
+	volatile char c = 'c';
+	const volatile int i = 0;
+	volatile long long  ll = 0;
+//    constexpr auto lam  = [](){ return str_const("%c\n");};
+
+	printc(CSTR("%c\n"),c);
+	printc(CSTR("dupa%d\n"),i);
+
+	return 0;
+}
+
