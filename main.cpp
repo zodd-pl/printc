@@ -44,9 +44,14 @@ constexpr std::uint8_t next_arg(str_const str,std::uint8_t pos)
     return pos;
 }
 
-constexpr bool is_one_before_last(str_const str,std::uint8_t pos )
+constexpr std::uint8_t last_pos(str_const str )
 {
-    return pos + 1 < str.size();
+    return str.size()-1;
+}
+
+constexpr bool is_last(str_const str,std::uint8_t pos )
+{
+    return pos + 1 == str.size();
 }
 
 constexpr std::uint8_t count_args(str_const str)
@@ -93,23 +98,28 @@ constexpr void check_conversion(FROM && from)
 template <typename FORMAT, typename T>
 constexpr bool check_args(FORMAT , T && t)
 {
+    constexpr str_const conversion_specifiers("csdio");
     constexpr auto str = FORMAT::value();
 
     if ( count_args(str)!=1)
     {
-        throw std::out_of_range("wrong argument number of arguments");  
+        throw std::out_of_range("wrong number of arguments");  
     }
 
-
+    if ( str.size() == 0)
+    {
+        throw std::invalid_argument("format string has size 0");  
+    }
+    
     constexpr auto pos = next_arg(str,0);
-    if (is_one_before_last(str,pos) )
+    if ( pos < last_pos(str) )
     {
         constexpr auto spec = pos+1;
         constexpr auto arg = str[spec];
-        constexpr auto known_arg = contains(str,arg);
+        constexpr auto known_arg = contains(conversion_specifiers,arg);
         if (!known_arg)
         {
-  		    throw std::out_of_range("unknown conversion specifier");               
+  		    throw std::invalid_argument("unknown conversion specifier");               
         }
         check_conversion<arg,T>(std::forward<T>(t));
        
@@ -117,7 +127,7 @@ constexpr bool check_args(FORMAT , T && t)
     }
     else
     {
- 		throw std::out_of_range("");       
+ 		throw std::invalid_argument("");       
     }
 
     return false;
