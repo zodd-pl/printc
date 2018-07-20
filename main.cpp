@@ -64,10 +64,29 @@ constexpr std::uint8_t count_args(str_const str)
     return args;
 }
 
-template<typename FROM,typename TO>
+constexpr bool contains(str_const str, char c)
+{
+    for (std::uint8_t pos = 0 ; pos < str.size(); pos++)
+    {
+         if (str[pos]==c)
+        {
+            return true;
+        }       
+    }
+    return false;
+}
+
+
+template<char C,typename FROM, std::enable_if_t< C =='c' ,int > = 0>
 constexpr void check_conversion(FROM && from)
 {
-    volatile const TO & t = from;
+    volatile const char & t = from;
+}
+
+template<char C,typename FROM, std::enable_if_t< C =='d' ,int > = 0>
+constexpr void check_conversion(FROM && from)
+{
+    volatile const int & t = from;
 }
 
 
@@ -87,25 +106,21 @@ constexpr bool check_args(FORMAT , T && t)
     {
         constexpr auto spec = pos+1;
         constexpr auto arg = str[spec];
-        if constexpr (arg == 'c')
-        {
-            check_conversion<T,char>(std::forward<T>(t));
-        }
-        else if constexpr ( arg == 'd')
-        {
-           check_conversion<T,int>(std::forward<T>(t));
-        }
-        else
+        constexpr auto known_arg = contains(str,arg);
+        if (!known_arg)
         {
   		    throw std::out_of_range("unknown conversion specifier");               
         }
+        check_conversion<arg,T>(std::forward<T>(t));
+       
+       return true;
     }
     else
     {
  		throw std::out_of_range("");       
     }
 
-    return true;
+    return false;
 }
 
 
