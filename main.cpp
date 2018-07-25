@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <array>
 #include <type_traits>
+#include <tuple>
 
 class str_const 
 { 
@@ -56,7 +57,7 @@ constexpr bool is_last(str_const str,std::uint8_t pos )
 
 constexpr std::uint8_t count_args(str_const str)
 {
-    std:uint8_t args =0;
+    std::uint8_t args =0;
     
     for (std::uint8_t pos = 0 ; pos < str.size(); pos++)
     {
@@ -151,6 +152,27 @@ constexpr std::size_t printc(FORMAT f, T && t)
 }
 
 
+template<int N,typename F,typename T>
+constexpr auto test(F,T)
+{
+	constexpr int n = N;
+	if constexpr (n == 0)
+	{
+		return T{};
+	}
+	else
+	{
+		auto tuple = std::tuple_cat(T{},std::tuple<int>{});
+		return test<n-1>(F{},tuple);
+	}
+} 
+
+struct X
+{
+};
+
+
+
 int main()
 {
 	volatile char c = 'c';
@@ -158,8 +180,14 @@ int main()
 	volatile long long  ll = 0;
 //    constexpr auto lam  = [](){ return str_const("%c\n");};
 
-	printc(CSTR("%c\n"),c);
-	printc(CSTR("dupa%d\n"),i);
+	//printc(CSTR("%c\n"),c);
+	//printc(CSTR("dupa%d\n"),ll);
+
+	auto test1 = test<3>(CSTR("asd"),std::tuple<const char*>());
+	static_assert(std::is_same_v<decltype(test1),std::tuple<const char *,int,int,int>>);
+	decltype(test1) x("test %d %d %d",c,i,ll);
+
+	std::apply(printf,x);
 
 	return 0;
 }
