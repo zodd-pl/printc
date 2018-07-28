@@ -133,90 +133,6 @@ constexpr bool contains(str_const str, char c)
 }
 
 
-template<char C,typename FROM, std::enable_if_t< C =='c' ,int > = 0>
-constexpr void check_conversion(FROM && from)
-{
-    volatile const char & t = from;
-}
-
-template<char C,typename FROM, std::enable_if_t< C =='d' ,int > = 0>
-constexpr void check_conversion(FROM && from)
-{
-    volatile const int & t = from;
-}
-
-
-template <typename FORMAT, typename T>
-constexpr bool check_args(FORMAT , T && t)
-{
-    constexpr str_const conversion_specifiers("csdio");
-    constexpr auto str = FORMAT::value();
-
-    if ( count_args(str)!=1)
-    {
-        throw std::out_of_range("wrong number of arguments");  
-    }
-
-    if ( str.size() == 0)
-    {
-        throw std::invalid_argument("format string has size 0");  
-    }
-    
-    constexpr auto pos = next_arg(str,0);
-    if ( pos < last_pos(str) )
-    {
-        constexpr auto spec = pos+1;
-        constexpr auto arg = str[spec];
-        constexpr auto known_arg = contains(conversion_specifiers,arg);
-        if (!known_arg)
-        {
-  		    throw std::invalid_argument("unknown conversion specifier");               
-        }
-        check_conversion<arg,T>(std::forward<T>(t));
-       
-       return true;
-    }
-    else
-    {
- 		throw std::invalid_argument("");       
-    }
-
-    return false;
-}
-
-
-template <typename FORMAT,typename T>
-constexpr std::size_t printc(FORMAT f, T && t)
-{
-	constexpr bool test = check_args<FORMAT,T>(f,std::forward<T>(t));
-	if (test)
-	{
-		printf(FORMAT::value().get(),t);
-	}
-	else
-	{
-		
-	}
-
-	return 1;
-}
-
-
-template<int N,typename F,typename T>
-constexpr auto test(F,T)
-{
-	constexpr int n = N;
-	if constexpr (n == 0)
-	{
-		return T{};
-	}
-	else
-	{
-		auto tuple = std::tuple_cat(T{},std::tuple<int>{});
-		return test<n-1>(F{},tuple);
-	}
-} 
-
 struct X
 {
 };
@@ -293,7 +209,7 @@ constexpr auto scan(F,T)
 }
 
 template<typename... ARG >
-void call_printf_impl(const char * format,  const volatile ARG&... arg)
+void call_printf_impl(const char * format, ARG... arg) // arg by value triggers automatic conversions
 {
 	printf(format,arg...);
 }
@@ -308,7 +224,7 @@ void call_printf(const char * format, std::index_sequence<INDEX...>, FORMAT_TYPE
 
 
 template <typename FORMAT,typename... ARG>
-constexpr void printc2(FORMAT, ARG&&... arg)
+constexpr void printc(FORMAT, ARG&&... arg)
 {
 	constexpr auto format = scan(FORMAT{},std::tuple<>());
 	using format_type = decltype(format);
@@ -327,20 +243,13 @@ int main()
 {
 	volatile char c = 'c';
 	const volatile int i = 0;
-	volatile long long  ll = 0;
+	volatile long long  ll = 111;
 //    constexpr auto lam  = [](){ return str_const("%c\n");};
 
 	const int & a1 = ll;
 
-	printc2(CSTR("%c\n"),c);
-	// printc2(CSTR("dupa%d\n"),ll);
-
-	constexpr auto test1 = test<3>(CSTR("asd"),std::tuple<const char*>());
-	
-	static_assert(std::is_same_v<decltype(test1),const std::tuple<const char *,int,int,int>>);
-	decltype(test1) x("test %d %d %d",c,i,ll);
-
-	std::apply(printf,x);
+	printc(CSTR("%c\n"),ll);
+	printc(CSTR("dupa%d\n"),ll);
 
 	constexpr auto ret1 = scan(CSTR("test %d %d %d"),std::tuple<const char *>());
 	// ret1.x;
