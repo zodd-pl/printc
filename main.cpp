@@ -138,6 +138,13 @@ struct X
 };
 
 
+struct compile_error
+{
+};
+
+template<typename T>
+constexpr bool is_compile_error = std::is_same<T,const compile_error>::value;
+
 constexpr auto make_conversion_table()
 {
 	constexpr auto table = std::make_tuple(
@@ -176,6 +183,19 @@ constexpr int find_conversion_index(str_const sub_format)
 	}
 }
 
+template<int INDEX,int SIZE>
+constexpr auto is_in_range()
+{
+	if constexpr ( ! (INDEX < SIZE) )
+	{
+		throw std::invalid_argument("conversion not found");		
+		return compile_error{}; 
+	}
+	else
+	{
+		return true;
+	}	
+}
 
 
 template<int POS = 0, typename F, typename T >
@@ -188,14 +208,9 @@ constexpr auto scan(F,T)
 	{
 		constexpr auto sub_format = format.sub_str(arg_pos);
 		constexpr auto index = find_conversion_index(sub_format);
+		constexpr auto index_in_range = is_in_range<index,conversion_table_size>();
 
-		if constexpr ( ! (index < conversion_table_size) )
-		{
-			throw std::invalid_argument("conversion not found");
-			static_assert(index < conversion_table_size);			
-			return 0;
-		}
-		else
+		if constexpr ( ! is_compile_error<decltype(index_in_range)> )
 		{
 			constexpr auto conversion = std::get<index>(conversion_table).second;
 			constexpr auto next_tuple = std::tuple_cat(T{}, std::make_tuple(conversion));
@@ -207,6 +222,22 @@ constexpr auto scan(F,T)
 		return T{};
 	}
 }
+
+template<std::size_t N0, std::size_t N1>
+constexpr auto is_same_size()
+{
+	if constexpr (N0 != N1 )
+	{
+		throw std::invalid_argument("arguments size does not match format");		
+		return compile_error{}; 
+	}
+	else
+	{
+		return true;
+	}
+}
+
+
 
 template<typename... ARG >
 void call_printf_impl(const char * format, ARG... arg) // arg by value triggers automatic conversions
@@ -228,13 +259,17 @@ constexpr void printc(FORMAT, ARG&&... arg)
 {
 	constexpr auto format = scan(FORMAT{},std::tuple<>());
 	using format_type = decltype(format);
-	static_assert(std::tuple_size<format_type>::value==sizeof...(arg));
 	
-	constexpr auto format_cstr = FORMAT::value().get();
-	
-
-	call_printf(format_cstr,std::index_sequence_for<ARG...>{},format,std::forward<ARG>(arg)...);
-	
+	if constexpr ( !is_compile_error<format_type> ) 
+	{
+		constexpr auto arg_size_match_format = is_same_size<std::tuple_size<format_type>::value,sizeof...(arg)>();
+		if constexpr ( !is_compile_error<decltype(arg_size_match_format)> )
+		{
+			constexpr auto format_cstr = FORMAT::value().get();
+			call_printf(format_cstr,std::index_sequence_for<ARG...>{},format,std::forward<ARG>(arg)...);
+			
+		}
+	}
 }
 
 
@@ -248,7 +283,7 @@ int main()
 
 	const int & a1 = ll;
 
-	printc(CSTR("%c\n"),ll);
+	printc(CSTR("%z\n"),c);
 	printc(CSTR("dupa%d\n"),ll);
 
 	constexpr auto ret1 = scan(CSTR("test %d %d %d"),std::tuple<const char *>());
